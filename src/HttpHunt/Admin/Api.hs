@@ -1,21 +1,21 @@
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DataKinds     #-}
 {-# LANGUAGE TypeOperators #-}
 
 module HttpHunt.Admin.Api where
 
-import Data.Aeson
-import Data.Text (Text)
-import qualified Data.Text           as Text
-import qualified Data.UUID           as UUID
-import           Data.UUID.V4        (nextRandom)
-import           RIO                  hiding ( Handler )
-import qualified RIO.HashMap          as HM
-import qualified RIO.Vector           as V
-import Servant
+import           Data.Aeson
+import           Data.Text       (Text)
+import qualified Data.Text       as Text
+import qualified Data.UUID       as UUID
+import           Data.UUID.V4    (nextRandom)
+import           RIO             hiding (Handler)
+import qualified RIO.HashMap     as HM
+import qualified RIO.Vector      as V
+import           Servant
 
-import HttpHunt.Config
-import HttpHunt.Redis as DB
-import HttpHunt.Types
+import           HttpHunt.Config
+import           HttpHunt.Redis  as DB
+import           HttpHunt.Types
 
 
 type AdminHuntApi =
@@ -23,10 +23,10 @@ type AdminHuntApi =
     "admin" :> "endpoints" :> Header "TeamName" Text
         :> Get '[JSON] Value
     -- create a new article
-    :<|> "admin" :> "Articles" :> Header "TeamName" Text
+    :<|> "admin" :> "articles" :> Header "TeamName" Text
         :> ReqBody '[JSON] Article :> Post '[JSON] Value
     -- get a particular article
-    :<|> "admin" :> "Articles" :> Header "TeamName" Text
+    :<|> "admin" :> "articles" :> Header "TeamName" Text
         :> Capture "articleId" UUID.UUID :> Get '[JSON] Value
     -- update a particular article
     :<|> "admin" :> "articles" :> Header "TeamName" Text
@@ -36,7 +36,7 @@ type AdminHuntApi =
     :<|> "admin" :> "articles" :> Header "TeamName" Text
         :> Capture "articleId" UUID.UUID :> Delete '[JSON] Value
     -- Add a comment to a particular article
-    :<|> "admin" :> "posts" :> "comments" :> Header "TeamName" Text
+    :<|> "admin" :> "articles" :> "comments" :> Header "TeamName" Text
         :> Capture "articleId" UUID.UUID  :> ReqBody '[JSON] ArticleComment
         :> Post '[JSON] Value
     -- delete a comment from a particular article
@@ -62,7 +62,7 @@ getAdminEndpointsH (Just teamName) = do
         endpoint = AdminEndpoints
     conn <- asks _getRedisConn
     liftIO $ DB.upsertScoreCard conn teamName endpoint method
-    return $ Array . V.fromList $ map (String . Text.pack . show) adminEdpoints
+    return $ toJSON adminEdpoints
 
 postNewArticleH :: Maybe Text -> Article -> HttpHuntApp Value
 postNewArticleH Nothing _ = noTeamNameResponse
@@ -163,12 +163,42 @@ noTeamNameResponse = return $ Object $ HM.fromList [
     , ("message", String "missing 'TeamName' header")
     ]
 
-adminEdpoints = [
-    AdminEndpoints
-    , AdminArticleCreate
-    , AdminArticleDetail
-    , AdminArticleUpdate
-    , AdminArticleDelete
-    , AdminArticleCommentCreate
-    , AdminArticleCommentDelete
+adminEdpoints :: Value
+adminEdpoints =  Array $ V.fromList [
+    Object $ HM.fromList [
+        ("endpoint", String "admin/endpoints"),
+        ("method", String "GET"),
+        ("payload",  Null),
+        ("content", String "json")]
+    , Object $ HM.fromList [
+        ("endpoint", String "admin/articles"),
+        ("method", String "POST"),
+        ("payload",  String "Article"),
+        ("content", String "json")]
+    , Object $ HM.fromList [
+        ("endpoint", String "admin/articles/{ARTICLE_ID}"),
+        ("method", String "GET"),
+        ("payload",  Null),
+        ("content", String "json")]
+    , Object $ HM.fromList [
+        ("endpoint", String "admin/articles/{ARTICLE_ID}"),
+        ("method", String "PUT"),
+        ("payload",  String "Article"),
+        ("content", String "json")]
+    , Object $ HM.fromList [
+        ("endpoint", String "admin/articles/{ARTICLE_ID}"),
+        ("method", String "DELETE"),
+        ("payload",  Null),
+        ("content", String "json")]
+    , Object $ HM.fromList [
+        ("endpoint", String "admin/articles/comments/{ARTICLE_ID}"),
+        ("method", String "POST"),
+        ("payload", String "ArticleComment"),
+        ("content", String "json")]
+    , Object $ HM.fromList [
+        ("endpoint", String "admin/articles/comments/{ARTICLE_ID}"),
+        ("method", String "DELETE"),
+        ("payload", Null),
+        ("content", String "json")]
     ]
+

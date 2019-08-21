@@ -1,28 +1,26 @@
 module HttpHunt.Redis where
 
-import           Control.Lens            hiding ( (.=) )
+import           Control.Lens         hiding ((.=))
 import           Data.Aeson
 import           Data.Aeson.Lens
-import qualified Data.ByteString as B
-import           Data.ByteString.Lazy     ( toStrict )
-import           Data.List                (nub, delete)
+import qualified Data.ByteString      as B
+import           Data.ByteString.Lazy (toStrict)
+import qualified Data.HashMap.Lazy    as HML
+import qualified Data.HashSet         as HS
+import           Data.List            (delete, nub)
 import           Data.Maybe
-import qualified Data.HashMap.Lazy        as     HML
-import           Data.Text                ( pack )
+import qualified Data.Text            as T
 import           Data.Text.Encoding
-import qualified Data.UUID                as UUID
-import qualified Data.UUID.V4             as UUID4
-import           Data.Time.Clock                ( UTCTime
-                                                , getCurrentTime
-                                                )
-import qualified Database.Redis                as Redis
-import           RIO                     hiding ( (^.) )
-import qualified Data.HashSet as HS
-import qualified RIO.HashMap as HM
+import           Data.Time.Clock      (UTCTime, getCurrentTime)
+import qualified Data.UUID            as UUID
+import qualified Data.UUID.V4         as UUID4
+import qualified Database.Redis       as Redis
+import           RIO                  hiding ((^.))
+import qualified RIO.HashMap          as HM
 
-import HttpHunt.Config
-import HttpHunt.Exceptions
-import HttpHunt.Types
+import           HttpHunt.Config
+import           HttpHunt.Exceptions
+import           HttpHunt.Types
 
 type Method = Text
 type TeamName = Text
@@ -39,7 +37,7 @@ getPost conn puid = do
         Nothing -> throwRedisError "Can't find article"
         Just article -> case eitherDecodeStrict article of
                 Right article' -> return article'
-                Left decodeErr -> throwRedisError (pack decodeErr)
+                Left decodeErr -> throwRedisError (T.pack decodeErr)
 
 getAllPosts :: (MonadIO m, MonadThrow m) => Redis.Connection -> m [Article]
 getAllPosts conn = do
@@ -47,7 +45,7 @@ getAllPosts conn = do
     results <- liftIO $ Redis.runRedis conn $ Redis.keys keys
     checkedValue <- checkRedisError results
     case checkedValue of
-        [] -> return []
+        []       -> return []
         articles -> return $ mapMaybe decodeStrict articles
 
 updateWholePost :: (MonadIO m, MonadThrow m) => Redis.Connection -> UUID.UUID -> Article -> m UUID.UUID
@@ -104,8 +102,8 @@ data ScoreVal =
     | ExistingEndpointAndMethod
 
 scoreVal :: ScoreVal -> Int
-scoreVal NewEndpoint = 500
-scoreVal NewMethod = 150
+scoreVal NewEndpoint               = 500
+scoreVal NewMethod                 = 150
 scoreVal ExistingEndpointAndMethod = 5
 
 insertNewCard ::(MonadIO m, MonadThrow m) => Redis.Connection -> TeamName -> Endpoint -> Method -> m ScoreCard
@@ -122,21 +120,26 @@ insertNewCard conn name endp meth = do
 upsertScoreCard :: (MonadIO m, MonadThrow m) => Redis.Connection -> TeamName -> Endpoint -> Method -> m ScoreCard
 upsertScoreCard conn name endp meth = do
     let key = encodeUtf8 name
-    storedValue <- liftIO $ Redis.runRedis conn $ Redis.get key
-    checkedValue <- checkRedisError storedValue
-    case checkedValue of
-        Nothing -> throwScoreCardError
-        Just scoreCardBS -> do
-            let decodedCard = eitherDecodeStrict scoreCardBS
-            case decodedCard of
-                Left decodeErr -> throwRedisError (pack decodeErr)
-                (Right card) -> do
-                    let scoredCard' = scoring endp meth <$> decodedCard
-                        newValue = encode scoredCard'
-                    result <- liftIO $ Redis.runRedis conn $ Redis.setex key
-                                                                scoreExpiryDays
-                                                                (toStrict newValue)
-                    return card
+    itExists <- liftIO $ Redis.runRedis conn $ Redis.exists key
+    case itExists of
+        Left _ -> throwRedisError "Failed to check if scorecard exists"
+        Right False -> insertNewCard conn name endp meth
+        Right True -> do
+            storedValue <- liftIO $ Redis.runRedis conn $ Redis.get key
+            checkedValue <- checkRedisError storedValue
+            case checkedValue of
+                Nothing -> throwScoreCardError
+                Just scoreCardBS -> do
+                    let decodedCard = eitherDecodeStrict scoreCardBS :: Either String ScoreCard
+                    case decodedCard of
+                        Left decodeErr -> throwRedisError $ T.concat [T.pack decodeErr, " ", decodeUtf8 scoreCardBS]
+                        (Right card) -> do
+                            let scoredCard' = scoring endp meth card
+                                newValue = encode scoredCard'
+                            result <- liftIO $ Redis.runRedis conn $ Redis.setex key
+                                                                        scoreExpiryDays
+                                                                        (toStrict newValue)
+                            return card
 
 getScoreValFromRequest :: Endpoint -> Method -> ScoreCard -> ScoreVal
 getScoreValFromRequest endp meth scard =
@@ -150,13 +153,23 @@ getScoreValFromRequest endp meth scard =
 scoring :: Endpoint -> Method -> ScoreCard -> ScoreCard
 scoring endpoint method scorecard =
     let score' = scoreVal $ getScoreValFromRequest endpoint method scorecard
-    in scorecard { _totalScore = score' }
+    in scorecard {
+        _totalScore = score' + scorecard ^. totalScore
+        , _endpoints = updateEndpoints scorecard endpoint method
+        }
+
+updateEndpoints ::  ScoreCard -> Endpoint -> Method -> HashMap Endpoint (HashSet Text)
+updateEndpoints scorecard endpoint method =
+    let endpointHM = scorecard ^. endpoints
+        oldSet = endpointHM ^.at endpoint
+        newSet = maybe (HS.insert method HS.empty) (HS.insert method) oldSet
+    in HM.insert endpoint newSet endpointHM
 
 -- | Helper functions
 checkRedisError :: (MonadIO m, MonadThrow m) => Either Redis.Reply a -> m a
 checkRedisError (Left redisError) = do
     tstamp <- liftIO getCurrentTime
-    throwRedisError (pack . show $ redisError)
+    throwRedisError (T.pack . show $ redisError)
 checkRedisError (Right val) = pure val
 
 throwRedisError :: (MonadThrow m) => Text -> m a

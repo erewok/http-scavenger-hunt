@@ -3,3 +3,4 @@
 .vscode/
 .ghc.environment*
 dist-newstyle/
+.env

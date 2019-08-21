@@ -1,8 +1,8 @@
 module HttpHunt.Exceptions where
 
-import Data.Text (Text)
-import GHC.Generics
-import RIO
+import           Data.Text    (Text)
+import           GHC.Generics
+import           RIO
 
 data AppExceptions
   = DbError Text

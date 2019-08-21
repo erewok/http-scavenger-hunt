@@ -3,20 +3,20 @@
 
 module HttpHunt.Config where
 
-import Control.Lens
-import           Data.Maybe                     ( fromJust, isJust )
+import           Control.Lens
+import           Data.Maybe     (fromJust, isJust)
 import           Data.Text
+import qualified Database.Redis as Redis
 import           GHC.Generics
-import qualified Database.Redis                as Redis
-import           System.Envy
 import           RIO
+import           System.Envy
 
 
 -- | Application context and such
 type HttpHuntApp = RIO HttpHuntCtx
 
 data HttpHuntCtx = HttpHuntCtx {
-    _getConfig :: ApiConfig
+    _getConfig      :: ApiConfig
     , _getRedisConn :: Redis.Connection
 }
 
@@ -39,25 +39,20 @@ instance Var Environment where
         _ -> Nothing
 
 data ApiConfig = ApiConfig {
-    environment :: Environment
-    , version :: Text
-    , port :: Int
-    , redisHost :: Text
-    , redisPort :: Text
-    , redisDb :: Text
+    environment   :: Environment
+    , version     :: Text
+    , port        :: Int
+    , redisHost   :: Text
+    , redisPort   :: Text
+    , redisDb     :: Text
     , redisPasswd :: Maybe Text
 } deriving (Eq, Show, Generic)
 
 instance DefConfig ApiConfig where
-    defConfig = ApiConfig Local "v1" 9999 "localhost" "6379" "5" Nothing
+    defConfig = ApiConfig Local "v1" 3000 "localhost" "6379" "3" Nothing
 
 -- All fields will be converted to uppercase
-instance FromEnv ApiConfig where
-  fromEnv = gFromEnvCustom Option {
-                    dropPrefixCount = 1
-                  , customPrefix = "HUNT"
-                  }
-
+instance FromEnv ApiConfig
 
 redisConn :: ApiConfig -> Either String Redis.ConnectInfo
 redisConn conf = if isJust $ redisPasswd conf

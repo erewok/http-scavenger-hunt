@@ -1,21 +1,21 @@
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DataKinds     #-}
 {-# LANGUAGE TypeOperators #-}
 
 module HttpHunt.Public.Api where
 
-import Data.Aeson
-import Data.Text (Text)
-import qualified Data.Text as Text
-import qualified Data.UUID                as UUID
-import           RIO                  hiding ( Handler )
-import qualified RIO.HashMap          as HM
-import qualified RIO.Vector           as V
-import Servant
-import Servant.HTML.Blaze                 (HTML)
+import           Data.Aeson
+import           Data.Text          (Text)
+import qualified Data.Text          as Text
+import qualified Data.UUID          as UUID
+import           RIO                hiding (Handler)
+import qualified RIO.HashMap        as HM
+import qualified RIO.Vector         as V
+import           Servant
+import           Servant.HTML.Blaze (HTML)
 
-import HttpHunt.Config
-import HttpHunt.Redis as DB
-import HttpHunt.Types
+import           HttpHunt.Config
+import           HttpHunt.Redis     as DB
+import           HttpHunt.Types
 
 
 type PublicHuntApi =
@@ -23,10 +23,10 @@ type PublicHuntApi =
      "public" :> "endpoints" :> Header "TeamName" Text
         :> Get '[JSON] Value
     -- list all articles
-    :<|> "public" :> "posts" :> Header "TeamName" Text
+    :<|> "public" :> "articles" :> Header "TeamName" Text
         :> Get '[HTML, JSON] [Article]
     -- get a particular article
-    :<|> "public" :> "posts" :> Header "TeamName" Text
+    :<|> "public" :> "articles" :> Header "TeamName" Text
         :> Capture "postId" UUID.UUID  :> Get '[HTML, JSON] Article
 
 publicHttpHuntApi :: ServerT PublicHuntApi HttpHuntApp
@@ -82,8 +82,10 @@ noTeamNameResponse = Object $ HM.fromList [
     , ("message", String "missing 'TeamName' header, so you won't get any credit, but this is a public endpoint!")
     ]
 
-publicEdpoints = [
-    PublicEndpoints
-    , PublicArticleList
-    , PublicArticleDetail
+publicEdpoints :: Value
+publicEdpoints =  Array $ V.fromList [
+    Object $ HM.fromList [("endpoint", String "public/endpoints"), ("method", String "GET"), ("payload",  Null), ("content", String "json")]
+    , Object $ HM.fromList [("endpoint", String "public/articles"), ("method", String "GET"), ("payload",  Null), ("content", String "html, json")]
+    , Object $ HM.fromList [("endpoint", String "public/articles/{ARTICLE_ID}"), ("method", String "GET"), ("payload",  Null), ("content", String "html, json")]
     ]
+

@@ -1,21 +1,21 @@
-{-# LANGUAGE DataKinds        #-}
-{-# LANGUAGE TypeOperators    #-}
+{-# LANGUAGE DataKinds     #-}
+{-# LANGUAGE TypeOperators #-}
 
 module HttpHunt.Api where
 
-import Control.Lens
-import Data.Aeson
-import Network.Wai
-import Network.Wai.Handler.Warp
-import qualified Database.Redis                as Redis
-import RIO hiding (Handler)
+import           Control.Lens
+import           Data.Aeson
+import qualified Database.Redis           as Redis
+import           Network.Wai
+import           Network.Wai.Handler.Warp
+import           RIO                      hiding (Handler)
 import qualified RIO.HashMap              as HM
-import Servant
+import           Servant
 
-import HttpHunt.Config
-import HttpHunt.Types
-import HttpHunt.Admin.Api
-import HttpHunt.Public.Api
+import           HttpHunt.Admin.Api
+import           HttpHunt.Config
+import           HttpHunt.Public.Api
+import           HttpHunt.Types
 
 -- | Lendio Offers Api Definition
 type HttpHuntApi =
