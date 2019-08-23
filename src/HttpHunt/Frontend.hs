@@ -7,6 +7,9 @@ module HttpHunt.Frontend where
 import           Data.Aeson
 import qualified Data.Text                   as T
 import           RIO
+import qualified RIO.HashMap                 as HM
+import qualified RIO.Vector                  as V
+
 import           Servant
 import           Servant.HTML.Blaze          (HTML)
 
@@ -20,12 +23,30 @@ import           HttpHunt.Redis              as DB
 import           HttpHunt.Types
 
 type FrontendApi =
-  "api" :> "scores" :> Get '[JSON] [ScoreCard]
-  :<|> "scoreboard" :> Get '[HTML] Html
-  :<|> "blog" :> Get '[HTML] Html
+    -- home page: shows how to get endpoints for public and admin
+    Get '[JSON] Value
+    :<|> "api" :> "scores" :> Get '[JSON] [ScoreCard]
+    :<|> "scoreboard" :> Get '[HTML] Html
+    :<|> "blog" :> Get '[HTML] Html
 
 frontendApi :: ServerT FrontendApi HttpHuntApp
-frontendApi = scoreResultsJSON :<|> scoreBoardHtml :<|> blogHtml
+frontendApi = homePageJSON :<|> scoreResultsJSON :<|> scoreBoardHtml :<|> blogHtml
+
+homePageJSON :: HttpHuntApp Value
+homePageJSON = pure $
+    Object $ HM.fromList [
+        ("status", String "success"),
+        ("message", String "Welcome to the HTTP Scavenger Hunt!"),
+        ("logo", String (T.pack _LOGO)),
+        ("tips", Array $ V.fromList [
+            String "If you identify yourself, you will get points for each new endpoint and method you try",
+            String "For some endpoints you should provide an auth header",
+            String "Admin endpoints can be discovered at /admin/endpoints",
+            String "Public endpoints can be discovered at /public/endpoints",
+            String "You may also find some poorly documented (or undcoumented!) endpoints as well!"
+            ])
+        ]
+
 
 scoreResultsJSON :: HttpHuntApp [ScoreCard]
 scoreResultsJSON = do

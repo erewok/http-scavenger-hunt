@@ -181,36 +181,36 @@ adminEdpoints =  Array $ V.fromList [
         ("endpoint", String "admin/endpoints"),
         ("method", String "GET"),
         ("payload",  Null),
-        ("content", String "json")]
+        ("content types", String "json")]
     , Object $ HM.fromList [
         ("endpoint", String "admin/articles"),
         ("method", String "POST"),
         ("payload",  String "Article"),
-        ("content", String "json")]
+        ("content types", String "json")]
     , Object $ HM.fromList [
         ("endpoint", String "admin/articles/{ARTICLE_ID}"),
         ("method", String "GET"),
         ("payload",  Null),
-        ("content", String "json")]
+        ("content types", String "json")]
     , Object $ HM.fromList [
         ("endpoint", String "admin/articles/{ARTICLE_ID}"),
         ("method", String "PUT"),
         ("payload",  String "Article"),
-        ("content", String "json")]
+        ("content types", String "json")]
     , Object $ HM.fromList [
         ("endpoint", String "admin/articles/{ARTICLE_ID}"),
         ("method", String "DELETE"),
         ("payload",  Null),
-        ("content", String "json")]
+        ("content types", String "json")]
     , Object $ HM.fromList [
         ("endpoint", String "admin/articles/comments/{ARTICLE_ID}"),
         ("method", String "POST"),
         ("payload", String "ArticleComment"),
-        ("content", String "json")]
+        ("content types", String "json")]
     , Object $ HM.fromList [
         ("endpoint", String "admin/articles/comments/{ARTICLE_ID}"),
         ("method", String "DELETE"),
         ("payload", Null),
-        ("content", String "json")]
+        ("content types", String "json")]
     ]
 

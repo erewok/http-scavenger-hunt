@@ -84,8 +84,8 @@ noTeamNameResponse = Object $ HM.fromList [
 
 publicEdpoints :: Value
 publicEdpoints =  Array $ V.fromList [
-    Object $ HM.fromList [("endpoint", String "public/endpoints"), ("method", String "GET"), ("payload",  Null), ("content", String "json")]
-    , Object $ HM.fromList [("endpoint", String "public/articles"), ("method", String "GET"), ("payload",  Null), ("content", String "html, json")]
-    , Object $ HM.fromList [("endpoint", String "public/articles/{ARTICLE_ID}"), ("method", String "GET"), ("payload",  Null), ("content", String "html, json")]
+    Object $ HM.fromList [("endpoint", String "public/endpoints"), ("method", String "GET"), ("payload",  Null), ("content types", String "json")]
+    , Object $ HM.fromList [("endpoint", String "public/articles"), ("method", String "GET"), ("payload",  Null), ("content types", String "json")]
+    , Object $ HM.fromList [("endpoint", String "public/articles/{ARTICLE_ID}"), ("method", String "GET"), ("payload",  Null), ("content types", String "json")]
     ]
 
