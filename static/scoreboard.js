@@ -1,5 +1,5 @@
 // Scavenger Hunt settings
-const totalEventDuration = 30;
+const totalEventDuration = 60 * 25;
 let intervalToNextRefresh = 15;
 let ongoing = false;
 
