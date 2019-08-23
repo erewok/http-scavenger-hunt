@@ -17,6 +17,7 @@ library
   hs-source-dirs:      src
   exposed-modules:     HttpHunt.Api
                       , HttpHunt.Config
+                      , HttpHunt.Frontend
                       , HttpHunt.Exceptions
                       , HttpHunt.Redis
                       , HttpHunt.Types

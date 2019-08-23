@@ -14,20 +14,28 @@ import           Servant
 
 import           HttpHunt.Admin.Api
 import           HttpHunt.Config
+import           HttpHunt.Frontend
 import           HttpHunt.Public.Api
 import           HttpHunt.Types
 
 -- | Lendio Offers Api Definition
 type HttpHuntApi =
   "health" :> Get '[JSON] Value
+  :<|> FrontendApi
   :<|> AdminHuntApi
   :<|> PublicHuntApi
+  :<|> "static" :> Raw
 
 httpHuntApi :: Proxy HttpHuntApi
 httpHuntApi = Proxy
 
 httpHuntServer :: ServerT HttpHuntApi HttpHuntApp
-httpHuntServer = healthHandler :<|> adminHttpHuntApi :<|> publicHttpHuntApi
+httpHuntServer =
+  healthHandler
+  :<|> frontendApi
+  :<|> adminHttpHuntApi
+  :<|> publicHttpHuntApi
+  :<|> serveDirectoryFileServer "static"
 
 -- We need a natural transformation between our app monad and servant's Handler monad
 hoister :: HttpHuntCtx -> HttpHuntApp a -> Handler a

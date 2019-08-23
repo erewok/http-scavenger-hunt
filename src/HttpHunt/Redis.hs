@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module HttpHunt.Redis where
 
 import           Control.Lens         hiding ((.=))
@@ -28,6 +30,10 @@ type TeamName = Text
 _ARTICLE_KEY :: ByteString
 _ARTICLE_KEY = "_ARTICLE_"
 
+_SCORING_KEY :: ByteString
+_SCORING_KEY = "_SCORE_"
+
+
 getPost :: (MonadIO m, MonadThrow m) => Redis.Connection -> UUID.UUID -> m Article
 getPost conn puid = do
     let key = B.append _ARTICLE_KEY (UUID.toASCIIBytes puid)
@@ -40,13 +46,7 @@ getPost conn puid = do
                 Left decodeErr -> throwRedisError (T.pack decodeErr)
 
 getAllPosts :: (MonadIO m, MonadThrow m) => Redis.Connection -> m [Article]
-getAllPosts conn = do
-    let keys = B.append _ARTICLE_KEY "*"
-    results <- liftIO $ Redis.runRedis conn $ Redis.keys keys
-    checkedValue <- checkRedisError results
-    case checkedValue of
-        []       -> return []
-        articles -> return $ mapMaybe decodeStrict articles
+getAllPosts conn = getAllKeysValues conn _ARTICLE_KEY
 
 updateWholePost :: (MonadIO m, MonadThrow m) => Redis.Connection -> UUID.UUID -> Article -> m UUID.UUID
 updateWholePost conn puid article = do
@@ -103,12 +103,15 @@ data ScoreVal =
 
 scoreVal :: ScoreVal -> Int
 scoreVal NewEndpoint               = 500
-scoreVal NewMethod                 = 150
+scoreVal NewMethod                 = 250
 scoreVal ExistingEndpointAndMethod = 5
+
+getAllScores :: (MonadIO m, MonadThrow m) => Redis.Connection -> m [ScoreCard]
+getAllScores conn = getAllKeysValues conn _SCORING_KEY
 
 insertNewCard ::(MonadIO m, MonadThrow m) => Redis.Connection -> TeamName -> Endpoint -> Method -> m ScoreCard
 insertNewCard conn name endp meth = do
-    let key = encodeUtf8 name
+    let key = B.append _SCORING_KEY $ encodeUtf8 name
         newcard = newScorecard name
         scoredCard = scoring endp meth newcard
         newValue = encode scoredCard
@@ -119,7 +122,7 @@ insertNewCard conn name endp meth = do
 
 upsertScoreCard :: (MonadIO m, MonadThrow m) => Redis.Connection -> TeamName -> Endpoint -> Method -> m ScoreCard
 upsertScoreCard conn name endp meth = do
-    let key = encodeUtf8 name
+    let key =  B.append _SCORING_KEY $ encodeUtf8 name
     itExists <- liftIO $ Redis.runRedis conn $ Redis.exists key
     case itExists of
         Left _ -> throwRedisError "Failed to check if scorecard exists"
@@ -166,6 +169,28 @@ updateEndpoints scorecard endpoint method =
     in HM.insert endpoint newSet endpointHM
 
 -- | Helper functions
+getAllKeysValues :: (MonadIO m, MonadThrow m, FromJSON a) => Redis.Connection -> ByteString -> m [a]
+getAllKeysValues conn keyPrefix = do
+    let keys = B.append keyPrefix "*"
+    results <- liftIO $ Redis.runRedis conn $ Redis.keys keys
+    checkedValue <- checkRedisError results
+    case checkedValue of
+        []     -> return []
+        someKeys -> do
+            results' <- mapM (getKey conn) someKeys
+            pure $ catMaybes results'
+
+
+getKey :: (MonadIO m, MonadThrow m, FromJSON a) => Redis.Connection -> ByteString -> m (Maybe a)
+getKey conn key = do
+    result <- liftIO $ Redis.runRedis conn $ Redis.get key
+    checkedValue <- checkRedisError result
+    case checkedValue of
+        Nothing    -> throwRedisError "Can't retrieve key"
+        Just value -> pure $ decodeStrict value
+
+
+
 checkRedisError :: (MonadIO m, MonadThrow m) => Either Redis.Reply a -> m a
 checkRedisError (Left redisError) = do
     tstamp <- liftIO getCurrentTime

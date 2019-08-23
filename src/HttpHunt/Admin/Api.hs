@@ -4,8 +4,10 @@
 module HttpHunt.Admin.Api where
 
 import           Data.Aeson
+import           Data.Maybe      (fromJust)
 import           Data.Text       (Text)
 import qualified Data.Text       as Text
+import           Data.Time.Clock (getCurrentTime)
 import qualified Data.UUID       as UUID
 import           Data.UUID.V4    (nextRandom)
 import           RIO             hiding (Handler)
@@ -54,7 +56,6 @@ adminHttpHuntApi =
     :<|> createCommentH
     :<|> deleteCommentH
 
-
 getAdminEndpointsH :: Maybe Text -> HttpHuntApp Value
 getAdminEndpointsH Nothing = noTeamNameResponse
 getAdminEndpointsH (Just teamName) = do
@@ -68,17 +69,28 @@ postNewArticleH :: Maybe Text -> Article -> HttpHuntApp Value
 postNewArticleH Nothing _ = noTeamNameResponse
 postNewArticleH (Just teamName) article = do
     let method = "POST"
-        endpoint = AdminArticleCreate
+        endpoint = AdminArticleList
     conn <- asks _getRedisConn
-    puid <- liftIO nextRandom
-    result <- liftIO $ updateWholePost conn puid $ article { _pid = Just puid}
+    article' <- liftIO $ newArticleHelper article
+    result <- liftIO $ updateWholePost conn (fromJust $ article' ^. pid) article'
     scorecard <- liftIO $ DB.upsertScoreCard conn teamName endpoint method
     return $ Object $ HM.fromList [
         ("status", String "success")
         , ("currentScore", toJSON $ scorecard ^. totalScore)
         , ("author", String teamName)
-        , ("data", toJSON article)
+        , ("data", toJSON result)
         ]
+
+newArticleHelper :: Article -> IO Article
+newArticleHelper article = do
+    aid <- case article ^. pid of
+            Nothing        -> Just <$> nextRandom
+            Just articleId -> pure $ Just articleId
+    dtime <- case article ^. pubdate of
+            Nothing     -> Just <$> getCurrentTime
+            Just dtime' -> pure $ Just dtime'
+    return article{_pid = aid, _pubdate=dtime}
+
 
 getArticleDetailH :: Maybe Text -> UUID.UUID -> HttpHuntApp Value
 getArticleDetailH Nothing _ = noTeamNameResponse
@@ -99,7 +111,7 @@ putArticleH :: Maybe Text -> UUID.UUID -> Article -> HttpHuntApp Value
 putArticleH Nothing _ _ = noTeamNameResponse
 putArticleH (Just teamName) puid article = do
     let method = "PUT"
-        endpoint = AdminArticleUpdate
+        endpoint = AdminArticleDetail
     conn <- asks _getRedisConn
     result <- liftIO $ patchPost conn puid article
     scorecard <- liftIO $ DB.upsertScoreCard conn teamName endpoint method
@@ -114,7 +126,7 @@ deleteArticleH :: Maybe Text -> UUID.UUID -> HttpHuntApp Value
 deleteArticleH Nothing _ = noTeamNameResponse
 deleteArticleH (Just teamName) puid = do
     let method = "DELETE"
-        endpoint = AdminArticleDelete
+        endpoint = AdminArticleDetail
     conn <- asks _getRedisConn
     liftIO $ DB.deletePost conn puid
     scorecard <- liftIO $ DB.upsertScoreCard conn teamName endpoint method
@@ -128,7 +140,7 @@ createCommentH :: Maybe Text -> UUID.UUID -> ArticleComment -> HttpHuntApp Value
 createCommentH Nothing _ _ = noTeamNameResponse
 createCommentH(Just teamName) puid comment = do
     let method = "POST"
-        endpoint = AdminArticleCommentCreate
+        endpoint = AdminArticleComments
     conn <- asks _getRedisConn
     article <- liftIO $ DB.createPostComment conn comment
     scorecard <- liftIO $ DB.upsertScoreCard conn teamName endpoint method
@@ -143,7 +155,7 @@ deleteCommentH :: Maybe Text -> UUID.UUID -> ArticleComment -> HttpHuntApp Value
 deleteCommentH Nothing _ _ = noTeamNameResponse
 deleteCommentH(Just teamName) puid comment = do
     let method = "DELETE"
-        endpoint = AdminArticleCommentCreate
+        endpoint = AdminArticleComments
     conn <- asks _getRedisConn
     article <- liftIO $ DB.deletePostComment conn comment
     scorecard <- liftIO $ DB.upsertScoreCard conn teamName endpoint method

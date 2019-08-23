@@ -24,10 +24,10 @@ type PublicHuntApi =
         :> Get '[JSON] Value
     -- list all articles
     :<|> "public" :> "articles" :> Header "TeamName" Text
-        :> Get '[HTML, JSON] [Article]
+        :> Get '[JSON] [Article]
     -- get a particular article
     :<|> "public" :> "articles" :> Header "TeamName" Text
-        :> Capture "postId" UUID.UUID  :> Get '[HTML, JSON] Article
+        :> Capture "postId" UUID.UUID  :> Get '[JSON] Article
 
 publicHttpHuntApi :: ServerT PublicHuntApi HttpHuntApp
 publicHttpHuntApi =

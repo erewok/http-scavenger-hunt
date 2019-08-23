@@ -1,56 +1,76 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE TemplateHaskell       #-}
 
 module HttpHunt.Types where
 
-import Control.Lens
-import Data.Aeson
-import Data.Aeson.Types
-import Data.Hashable (Hashable)
-import Data.HashSet (HashSet)
-import RIO hiding (Handler)
-import RIO.HashMap (HashMap)
-import qualified RIO.HashMap as HM
-import Data.Text (Text)
-import qualified Data.Text as Text
-import qualified Data.UUID                as UUID
-import           Text.Blaze.Html             ( Html )
-import Text.Blaze.Html5 ( (!), Attribute, ToMarkup(..) )
+import           Control.Lens                hiding ((.=))
+import           Data.Aeson
+import           Data.Aeson.Types
+import           Data.Hashable               (Hashable)
+import           Data.HashSet                (HashSet)
+import           Data.Maybe
+import           Data.Text                   (Text)
+import qualified Data.Text                   as Text
+import qualified Data.UUID                   as UUID
+import           RIO                         hiding (Handler)
+import           RIO.HashMap                 (HashMap)
+import qualified RIO.HashMap                 as HM
+import           Text.Blaze.Html             (Html)
+import           Text.Blaze.Html5            (Attribute, ToMarkup (..), (!))
 import qualified Text.Blaze.Html5            as H
 import qualified Text.Blaze.Html5.Attributes as A
 
-import Data.Time.Clock (UTCTime)
-import GHC.Generics
+import           Data.Time.Clock             (UTCTime)
+import           GHC.Generics
 
 
 -- | Different types of site content: posts and post comments
 data Article = Article {
-    _pid :: Maybe UUID.UUID
-    , _author :: Text
-    , _title :: Text
-    , _content :: Text
-    , _pubdate :: UTCTime
+    _pid        :: Maybe UUID.UUID
+    , _author   :: Maybe Text
+    , _title    :: Text
+    , _content  :: Text
+    , _pubdate  :: Maybe UTCTime
     , _comments :: [ArticleComment]
 } deriving (Eq, Show, Generic)
 
-instance FromJSON Article
-instance ToJSON Article
+instance FromJSON Article where
+    parseJSON = withObject "article" $ \a -> do
+        _pid <- a .:? "id"
+        _author <- a .: "author"
+        _title <- a .: "title"
+        _content <- a .: "content"
+        _pubdate <- a .:? "pubdate"
+        _comments <- a .:? "comments" .!= []
+        return Article{..}
+
+instance ToJSON Article where
+    toJSON Article{..} = object [
+        "id" .= _pid,
+        "author"  .= _author,
+        "title"  .= _title,
+        "content"  .= _content,
+        "pubdate"  .= _pubdate,
+        "comments"  .= _comments
+        ]
+
 instance ToMarkup Article where
     toMarkup article = pageBase $ do
             H.h1 . toMarkup $ _title article
             H.p . toMarkup $ _content article
             H.p . toMarkup . show $ _pubdate article
-            H.p . toMarkup $ _author article
+            if isJust (_author article) then H.p . toMarkup . fromJust $ _author article else H.p ""
             mapM_ toMarkup $ _comments article
 
 instance ToMarkup [Article] where
     toMarkup articles = pageBase $ mapM_ toMarkup articles
 
 data ArticleComment = ArticleComment {
-    _articleId :: UUID.UUID
-    , _comment :: Text
+    _articleId       :: UUID.UUID
+    , _comment       :: Text
     , _commentAuthor :: Text
 } deriving (Eq, Show, Generic)
 
@@ -72,11 +92,11 @@ newScorecard teamName = ScoreCard {
 
 data ScoreCard = ScoreCard {
     -- this is how we'll identify the team
-    _teamName :: Text
+    _teamName     :: Text
     -- team's total score
     , _totalScore :: Int
     -- map of endpoint to HTTP Methods used
-    , _endpoints :: HashMap Endpoint (HashSet Text)
+    , _endpoints  :: HashMap Endpoint (HashSet Text)
 } deriving (Eq, Show, Generic)
 
 instance FromJSON ScoreCard
@@ -89,19 +109,15 @@ instance ToMarkup ScoreCard where
 data Endpoint =
     -- admin endpoints
     AdminEndpoints
-    | AdminArticleCreate
+    | AdminArticleList
     | AdminArticleDetail
-    | AdminArticleUpdate
-    | AdminArticleDelete
-    | AdminArticleCommentCreate
-    | AdminArticleCommentDelete
+    | AdminArticleComments
     -- public endpoints
     | PublicEndpoints
     | PublicArticleList
     | PublicArticleDetail
     -- uncategorized endpoints
     | FrontPage
-    | Login
     | ScoreBoard
     deriving (Eq, Show, Generic)
 
@@ -114,17 +130,13 @@ instance FromJSONKey Endpoint where
 parseEndpoint :: Text -> Endpoint
 parseEndpoint = \case
     "AdminEndpoints" -> AdminEndpoints
-    "AdminArticleCreate" -> AdminArticleCreate
+    "AdminArticleList" -> AdminArticleList
     "AdminArticleDetail" -> AdminArticleDetail
-    "AdminArticleUpdate" -> AdminArticleUpdate
-    "AdminArticleDelete" -> AdminArticleDelete
-    "AdminArticleCommentCreate" -> AdminArticleCommentCreate
-    "AdminArticleCommentDelete" -> AdminArticleCommentDelete
+    "AdminArticleComments" -> AdminArticleComments
     "PublicEndpoints" -> PublicEndpoints
     "PublicArticleList" -> PublicArticleList
     "PublicArticleDetail" -> PublicArticleDetail
     "FrontPage" -> FrontPage
-    "Login" -> Login
     "ScoreBoard" -> ScoreBoard
 
 instance ToJSONKey Endpoint where
@@ -132,7 +144,8 @@ instance ToJSONKey Endpoint where
 
 -- | Some basic HTML
 pageBase :: Html -> Html
-pageBase content = H.docTypeHtml $ H.body content
+pageBase content = H.docTypeHtml $
+    H.body content
 
 _LOGO :: String
 _LOGO = unlines [
