@@ -38,9 +38,10 @@ scoreBoardHtml = pure $ pageBase $ do
         H.head scripts
         H.body $
             H.div ! A.class_ "content" $ do
-                H.h1 "Scavenger Hunt Scoreboard"
+                H.h1 "HTTP Scavenger Hunt"
                 H.div ! A.class_ "hunt-meta" $
                     H.button ! A.id "hunt-start" $ "Start Scavenger Hunt"
+                H.div ! A.class_ "clearfix" $ ""
                 H.div ! A.id "scoreboard" $ ""
                 H.script ! A.src "static/scoreboard.js" $ ""
 

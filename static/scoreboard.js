@@ -1,6 +1,5 @@
 // Scavenger Hunt settings
-const totalEventDuration = 30 * 60;
-let totalTimeRemaining = totalEventDuration;
+const totalEventDuration = 30;
 let intervalToNextRefresh = 15;
 let ongoing = false;
 
@@ -143,7 +142,9 @@ const renderResults = data => {
 
 // scavenger hunt init
 initiateEvent = () => {
+  let totalTimeRemaining = totalEventDuration;
   ongoing = true;
+  getScores(renderResults);
   if (metadata === null) {
     metadata = document.querySelector(".hunt-meta");
   }
@@ -179,6 +180,8 @@ initiateEvent = () => {
       // final refresh, which will set the leader
       getScores(renderResults);
       clearInterval(interval);
+      newTotalTimeRemaining.parentNode.removeChild(newTotalTimeRemaining);
+      timeToNextRefresh.parentNode.removeChild(timeToNextRefresh);
     }
   }, 1000);
 };

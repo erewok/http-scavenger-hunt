@@ -118,6 +118,12 @@ p {
   margin: auto;
   padding: 3.2rem 0.8rem;
 }
+#hunt-start {
+  float: right;
+}
+.clearfix {
+  clear: both;
+}
 
 .table {
   width: 100%;
