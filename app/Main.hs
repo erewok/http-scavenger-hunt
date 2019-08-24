@@ -39,9 +39,10 @@ main = do
         Right redisConnInfo -> do
             conn <- checkedConnect redisConnInfo
             let ctx = HttpHuntCtx config conn
+                appPort = port config
                 warpSettings = Warp.defaultSettings
-                portSettings = Warp.setPort (port config) warpSettings
+                portSettings = Warp.setPort appPort warpSettings
                 settings = Warp.setTimeout 55 portSettings
-
+            Prelude.putStrLn $ "*****The HTTP Scavenger Hunt is now running on Port " ++ show appPort ++ "*****"
             Warp.runSettings settings $ httpHuntApp ctx
 
