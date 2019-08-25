@@ -14,7 +14,7 @@ import           Servant
 import           Servant.HTML.Blaze          (HTML)
 
 import           Text.Blaze.Html             (Html)
-import           Text.Blaze.Html5            ((!))
+import           Text.Blaze.Html5            (ToMarkup (..), (!))
 import qualified Text.Blaze.Html5            as H
 import qualified Text.Blaze.Html5.Attributes as A
 
@@ -70,7 +70,12 @@ blogHtml :: HttpHuntApp Html
 blogHtml = do
     conn <- asks _getRedisConn
     articles <- liftIO $ DB.getAllPosts conn
-    pure $ pageBase $ H.ul $ mapM_  articleListItem articles
+    pure $ pageBase $ do
+        H.head $
+            H.link ! A.href "static/styles.css" ! A.rel "stylesheet" ! A.type_ "text/css"
+        H.div ! A.class_ "content" $ do
+            H.h1 "The HTTP Scavenger Hunt Blog"
+            H.ul $ toMarkup articles
 
 articleListItem :: Article -> Html
 articleListItem article =

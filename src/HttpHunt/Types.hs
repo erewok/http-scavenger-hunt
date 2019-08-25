@@ -58,15 +58,22 @@ instance ToJSON Article where
         ]
 
 instance ToMarkup Article where
-    toMarkup article = pageBase $ do
-            H.h1 . toMarkup $ _title article
+    toMarkup article = do
+            H.h2 . toMarkup $ _title article
+            if isJust (_pubdate article)
+                then H.p . toMarkup . show . fromJust $ _pubdate article
+                else ""
+            H.p . toMarkup . fromJust $ _author article
             H.p . toMarkup $ _content article
-            H.p . toMarkup . show $ _pubdate article
-            if isJust (_author article) then H.p . toMarkup . fromJust $ _author article else H.p ""
-            mapM_ toMarkup $ _comments article
+            if null (_comments article)
+                then ""
+                else do
+                    H.h3 "Comments"
+                    H.ul $ mapM_ toMarkup $ _comments article
+
 
 instance ToMarkup [Article] where
-    toMarkup articles = pageBase $ mapM_ toMarkup articles
+    toMarkup = mapM_ (H.li . toMarkup)
 
 data ArticleComment = ArticleComment {
     _articleId       :: UUID.UUID
@@ -89,7 +96,7 @@ instance ToJSON ArticleComment where
         ]
 
 instance ToMarkup ArticleComment where
-    toMarkup comment = pageBase $ do
+    toMarkup comment = do
             H.p . toMarkup $ _comment comment
             H.p . toMarkup $ _commentAuthor comment
 
