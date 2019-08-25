@@ -74,8 +74,19 @@ data ArticleComment = ArticleComment {
     , _commentAuthor :: Text
 } deriving (Eq, Show, Generic)
 
-instance FromJSON ArticleComment
-instance ToJSON ArticleComment
+instance FromJSON ArticleComment where
+    parseJSON = withObject "comment" $ \ac -> do
+        _articleId <- ac .: "articleId"
+        _comment <- ac .: "comment"
+        _commentAuthor <- ac .: "author"
+        return ArticleComment{..}
+
+instance ToJSON ArticleComment where
+    toJSON ArticleComment{..} = object [
+        "articleId" .= _articleId,
+        "comment"  .= _comment,
+        "author"  .= _commentAuthor
+        ]
 
 instance ToMarkup ArticleComment where
     toMarkup comment = pageBase $ do
@@ -116,6 +127,8 @@ data Endpoint =
     | PublicEndpoints
     | PublicArticleList
     | PublicArticleDetail
+    | PublicArticleDescribe
+    | PublicCommentDescribe
     -- uncategorized endpoints
     | FrontPage
     | ScoreBoard
@@ -136,6 +149,8 @@ parseEndpoint = \case
     "PublicEndpoints" -> PublicEndpoints
     "PublicArticleList" -> PublicArticleList
     "PublicArticleDetail" -> PublicArticleDetail
+    "PublicArticleDescribe" -> PublicArticleDescribe
+    "PublicCommentDescribe" -> PublicCommentDescribe
     "FrontPage" -> FrontPage
     "ScoreBoard" -> ScoreBoard
 

@@ -77,7 +77,7 @@ postNewArticleH (Just teamName) article = do
     return $ Object $ HM.fromList [
         ("status", String "success")
         , ("currentScore", toJSON $ scorecard ^. totalScore)
-        , ("author", String teamName)
+        , ("teamName", String teamName)
         , ("data", toJSON result)
         ]
 
@@ -103,7 +103,7 @@ getArticleDetailH (Just teamName) puid = do
     return $ Object $ HM.fromList [
         ("status", String "success")
         , ("currentScore", toJSON $ scorecard ^. totalScore)
-        , ("author", String teamName)
+        , ("teamName", String teamName)
         , ("data", toJSON article)
         ]
 
@@ -118,7 +118,7 @@ putArticleH (Just teamName) puid article = do
     return $ Object $ HM.fromList [
         ("status", String "success")
         , ("currentScore", toJSON $ scorecard ^. totalScore)
-        , ("author", String teamName)
+        , ("teamName", String teamName)
         , ("data", toJSON article)
         ]
 
@@ -133,7 +133,7 @@ deleteArticleH (Just teamName) puid = do
     return $ Object $ HM.fromList [
         ("status", String "success")
         , ("currentScore", toJSON $ scorecard ^. totalScore)
-        , ("author", String teamName)
+        , ("teamName", String teamName)
         ]
 
 createCommentH :: Maybe Text -> UUID.UUID -> ArticleComment -> HttpHuntApp Value
@@ -147,7 +147,7 @@ createCommentH(Just teamName) puid comment = do
     return $ Object $ HM.fromList [
         ("status", String "success")
         , ("currentScore", toJSON $ scorecard ^. totalScore)
-        , ("author", String teamName)
+        , ("teamName", String teamName)
         , ("data", toJSON article)
         ]
 
@@ -162,7 +162,7 @@ deleteCommentH(Just teamName) puid comment = do
     return $ Object $ HM.fromList [
         ("status", String "success")
         , ("currentScore", toJSON $ scorecard ^. totalScore)
-        , ("author", String teamName)
+        , ("teamName", String teamName)
         , ("data", toJSON article)
         ]
 
