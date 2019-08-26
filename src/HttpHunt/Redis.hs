@@ -195,7 +195,7 @@ upsertScoreCard conn name endp meth = do
                             result <- liftIO $ Redis.runRedis conn $ Redis.setex key
                                                                         scoreExpiryDays
                                                                         (toStrict newValue)
-                            return card
+                            return scoredCard'
 
 getScoreValFromRequest :: Endpoint -> Method -> ScoreCard -> ScoreVal
 getScoreValFromRequest endp meth scard =
