@@ -33,7 +33,10 @@ _ARTICLE_KEY = "_ARTICLE_"
 _SCORING_KEY :: ByteString
 _SCORING_KEY = "_SCORE_"
 
+_TEAM_KEY :: ByteString
+_TEAM_KEY = "_TEAM_KEY"
 
+-- | Post related Redis Functions
 getPost :: (MonadIO m, MonadThrow m) => Redis.Connection -> UUID.UUID -> m Article
 getPost conn puid = do
     let key = B.append _ARTICLE_KEY (UUID.toASCIIBytes puid)
@@ -55,8 +58,8 @@ updateWholePost conn puid article = do
     result <- liftIO $ Redis.runRedis conn $ Redis.set key (toStrict value)
     return puid
 
-patchPost :: (MonadIO m, MonadThrow m) => Redis.Connection -> UUID.UUID -> Article -> m UUID.UUID
-patchPost conn puid particle = do
+putPost :: (MonadIO m, MonadThrow m) => Redis.Connection -> UUID.UUID -> Article -> m UUID.UUID
+putPost conn puid particle = do
     oldVersion <- getPost conn puid
     -- we're simplifying here: turn them into HashMaps (via JSON) and then merge them together
     let oldArticleHM = toJSON oldVersion ^? _Object
@@ -74,6 +77,7 @@ deletePost conn puid = do
     result <- liftIO $ Redis.runRedis conn $ Redis.del [key]
     return puid
 
+-- | Comment related Redis functions
 createPostComment :: (MonadIO m, MonadThrow m) => Redis.Connection -> ArticleComment -> m Article
 createPostComment conn comment = do
     let puid = comment ^. articleId
@@ -93,6 +97,55 @@ deletePostComment conn comment = do
     let article' =  article {_comments = delete comment (article ^. comments)}
     updateWholePost conn puid article'
     return article'
+
+-- | Team-related functions
+getAllTeams :: (MonadIO m, MonadThrow m) => Redis.Connection -> m [Team]
+getAllTeams conn = getAllKeysValues conn _TEAM_KEY
+
+updateWholeTeam :: (MonadIO m, MonadThrow m) => Redis.Connection -> Text -> Team -> m Team
+updateWholeTeam conn name team = do
+    let key = B.append _TEAM_KEY $ encodeUtf8 name
+        value = encode team
+    result <- liftIO $ Redis.runRedis conn $ Redis.set key (toStrict value)
+    return team
+
+putTeam :: (MonadIO m, MonadThrow m) => Redis.Connection -> Text -> Team -> m Team
+putTeam conn name team = do
+    let key = B.append _TEAM_KEY $ encodeUtf8 name
+    oldVersion <- getKey conn key :: (MonadIO m, MonadThrow m) => m (Maybe Team)
+    -- we're simplifying here: turn them into HashMaps (via JSON) and then merge them together
+    let oldTeamHM = toJSON oldVersion ^? _Object
+        newTeameHM = toJSON team ^? _Object
+        mergedTeam = HML.union <$> oldTeamHM <*> newTeameHM
+    -- now that we have a merged HashMap, we need to make it into an Article
+        parsedMergedTeam = fromJSON . Object <$> mergedTeam :: Maybe (Result Team)
+    case parsedMergedTeam of
+        Just (Success team') -> updateWholeTeam conn name team'
+        _                    -> throwM $ OtherError "Failed merging teams!"
+
+
+patchTeam :: (MonadIO m, MonadThrow m) => Redis.Connection -> Text -> Value -> m Team
+patchTeam conn name hm = do
+    let key = B.append _TEAM_KEY $ encodeUtf8 name
+    case hm of
+        Object newTeam -> do
+            oldVersion <- getKey conn key :: (MonadIO m, MonadThrow m) => m (Maybe Team)
+            -- we're simplifying here: turn them into HashMaps (via JSON) and then merge them together
+            let oldTeamHM = toJSON oldVersion ^? _Object
+                mergedTeam = HML.union <$> oldTeamHM <*> pure newTeam
+            -- now that we have a merged HashMap, we need to make it into an Article
+                parsedMergedTeam = fromJSON . Object <$> mergedTeam :: Maybe (Result Team)
+            case parsedMergedTeam of
+                Just (Success team') -> updateWholeTeam conn name team'
+                _                    -> throwM $ OtherError "Failed merging teams!"
+        _ -> throwM $ OtherError "Object required to patch team!"
+
+deleteTeam :: (MonadIO m, MonadThrow m) => Redis.Connection -> Text -> m Text
+deleteTeam conn name = do
+    let key = B.append _TEAM_KEY $ encodeUtf8 name
+    result <- liftIO $ Redis.runRedis conn $ Redis.del [key]
+    return name
+
 
 -- | Scoring related functions
 -- Includes type for computing a score
@@ -188,8 +241,6 @@ getKey conn key = do
     case checkedValue of
         Nothing    -> throwRedisError "Can't retrieve key"
         Just value -> pure $ decodeStrict value
-
-
 
 checkRedisError :: (MonadIO m, MonadThrow m) => Either Redis.Reply a -> m a
 checkRedisError (Left redisError) = do

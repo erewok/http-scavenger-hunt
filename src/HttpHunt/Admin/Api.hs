@@ -4,19 +4,21 @@
 module HttpHunt.Admin.Api where
 
 import           Data.Aeson
-import           Data.Maybe      (fromJust)
-import           Data.Text       (Text)
-import qualified Data.Text       as Text
-import           Data.Time.Clock (getCurrentTime)
-import qualified Data.UUID       as UUID
-import           Data.UUID.V4    (nextRandom)
-import           RIO             hiding (Handler)
-import qualified RIO.HashMap     as HM
-import qualified RIO.Vector      as V
+import qualified Data.ByteString     as B
+import           Data.Maybe          (fromJust)
+import           Data.Text           (Text)
+import qualified Data.Text           as Text
+import           Data.Time.Clock     (getCurrentTime)
+import qualified Data.UUID           as UUID
+import           Data.UUID.V4        (nextRandom)
+import           RIO                 hiding (Handler)
+import qualified RIO.HashMap         as HM
+import qualified RIO.Vector          as V
 import           Servant
 
 import           HttpHunt.Config
-import           HttpHunt.Redis  as DB
+import           HttpHunt.Exceptions
+import           HttpHunt.Redis      as DB
 import           HttpHunt.Types
 
 
@@ -45,6 +47,21 @@ type AdminHuntApi =
     :<|> "admin" :> "articles" :> "comments" :> Header "TeamName" Text
         :> Capture "articleId" UUID.UUID :> ReqBody '[JSON] ArticleComment
         :> Delete '[JSON] Value
+    -- learn about the teams participating
+    :<|> "admin" :> "teams" :> Header "TeamName" Text
+        :> Get '[JSON] Value
+    :<|> "admin" :> "teams" :> Header "TeamName" Text
+        :> ReqBody '[JSON] Team :> Post '[JSON] Value
+    :<|> "admin" :> "teams" :> Header "TeamName" Text
+        :> Capture "teamName" Text :> Get '[JSON] Value
+    :<|> "admin" :> "teams" :> Header "TeamName" Text
+        :> Capture "teamName" Text :> ReqBody '[JSON] Team
+        :> Put '[JSON] Value
+    :<|> "admin" :> "teams" :> Header "TeamName" Text
+        :> Capture "teamName" Text :> ReqBody '[JSON] Value
+        :> Patch '[JSON] Value
+    :<|> "admin" :> "teams" :> Header "TeamName" Text
+        :> Capture "teamName" Text :> Delete '[JSON] Value
 
 adminHttpHuntApi :: ServerT AdminHuntApi HttpHuntApp
 adminHttpHuntApi =
@@ -55,6 +72,13 @@ adminHttpHuntApi =
     :<|> deleteArticleH
     :<|> createCommentH
     :<|> deleteCommentH
+    :<|> listTeamsH
+    :<|> createTeamH
+    :<|> getTeamDetailH
+    :<|> putTeamDetailH
+    :<|> patchTeamDetailH
+    :<|> deleteTeamDetailH
+
 
 getAdminEndpointsH :: Maybe Text -> HttpHuntApp Value
 getAdminEndpointsH Nothing = noTeamNameResponse
@@ -65,6 +89,7 @@ getAdminEndpointsH (Just teamName) = do
     liftIO $ DB.upsertScoreCard conn teamName endpoint method
     return $ toJSON adminEdpoints
 
+-- | Article endpoints
 postNewArticleH :: Maybe Text -> Article -> HttpHuntApp Value
 postNewArticleH Nothing _ = noTeamNameResponse
 postNewArticleH (Just teamName) article = do
@@ -113,7 +138,7 @@ putArticleH (Just teamName) puid article = do
     let method = "PUT"
         endpoint = AdminArticleDetail
     conn <- asks _getRedisConn
-    result <- liftIO $ patchPost conn puid article
+    result <- liftIO $ putPost conn puid article
     scorecard <- liftIO $ DB.upsertScoreCard conn teamName endpoint method
     return $ Object $ HM.fromList [
         ("status", String "success")
@@ -136,6 +161,7 @@ deleteArticleH (Just teamName) puid = do
         , ("teamName", String teamName)
         ]
 
+-- | Comment endpoints
 createCommentH :: Maybe Text -> UUID.UUID -> ArticleComment -> HttpHuntApp Value
 createCommentH Nothing _ _ = noTeamNameResponse
 createCommentH(Just teamName) puid comment = do
@@ -166,6 +192,101 @@ deleteCommentH(Just teamName) puid comment = do
         , ("data", toJSON article)
         ]
 
+-- | Team endpoints
+listTeamsH :: Maybe Text -> HttpHuntApp Value
+listTeamsH Nothing = noTeamNameResponse
+listTeamsH (Just teamName) = do
+    let method = "GET"
+        endpoint = AdminTeamList
+    conn <- asks _getRedisConn
+    teams <- liftIO $ getAllTeams conn
+    scorecard <- liftIO $ DB.upsertScoreCard conn teamName endpoint method
+    return $ Object $ HM.fromList [
+        ("status", String "success")
+        , ("currentScore", toJSON $ scorecard ^. totalScore)
+        , ("teamName", String teamName)
+        , ("data", toJSON teams)
+        ]
+
+createTeamH :: Maybe Text -> Team -> HttpHuntApp Value
+createTeamH Nothing _            = noTeamNameResponse
+createTeamH (Just teamName) team = do
+    let method = "POST"
+        endpoint = AdminTeamList
+    conn <- asks _getRedisConn
+    team' <- liftIO $ updateWholeTeam conn (name team) team
+    scorecard <- liftIO $ DB.upsertScoreCard conn teamName endpoint method
+    return $ Object $ HM.fromList [
+        ("status", String "success")
+        , ("currentScore", toJSON $ scorecard ^. totalScore)
+        , ("teamName", String teamName)
+        , ("data", toJSON team')
+        ]
+
+getTeamDetailH :: Maybe Text -> Text -> HttpHuntApp Value
+getTeamDetailH Nothing _            = noTeamNameResponse
+getTeamDetailH (Just teamName) name = do
+    let method = "GET"
+        endpoint = AdminTeamDetail
+        key = B.append _TEAM_KEY $ encodeUtf8 name
+
+    conn <- asks _getRedisConn
+    team <- getKey conn key :: (MonadIO m, MonadThrow m) => m (Maybe Team)
+    case team of
+        Nothing -> throwM $ OtherError "missing team"
+        Just team' -> do
+            scorecard <- liftIO $ DB.upsertScoreCard conn teamName endpoint method
+            return $ Object $ HM.fromList [
+                ("status", String "success")
+                , ("currentScore", toJSON $ scorecard ^. totalScore)
+                , ("teamName", String teamName)
+                , ("data", toJSON team')
+                ]
+
+putTeamDetailH :: Maybe Text -> Text -> Team -> HttpHuntApp Value
+putTeamDetailH Nothing _ _               = noTeamNameResponse
+putTeamDetailH (Just teamName) name team = do
+    let method = "PUT"
+        endpoint = AdminTeamDetail
+    conn <- asks _getRedisConn
+    result <- liftIO $ putTeam conn name team
+    scorecard <- liftIO $ DB.upsertScoreCard conn teamName endpoint method
+    return $ Object $ HM.fromList [
+        ("status", String "success")
+        , ("currentScore", toJSON $ scorecard ^. totalScore)
+        , ("teamName", String teamName)
+        , ("data", toJSON team)
+        ]
+
+patchTeamDetailH :: Maybe Text ->  Text -> Value -> HttpHuntApp Value
+patchTeamDetailH Nothing _ _                   = noTeamNameResponse
+patchTeamDetailH (Just teamName) name partTeam = do
+    let method = "PATCH"
+        endpoint = AdminTeamDetail
+    conn <- asks _getRedisConn
+    result <- liftIO $ patchTeam conn name partTeam
+    scorecard <- liftIO $ DB.upsertScoreCard conn teamName endpoint method
+    return $ Object $ HM.fromList [
+        ("status", String "success")
+        , ("currentScore", toJSON $ scorecard ^. totalScore)
+        , ("teamName", String teamName)
+        , ("data", toJSON result)
+        ]
+
+deleteTeamDetailH :: Maybe Text -> Text -> HttpHuntApp Value
+deleteTeamDetailH Nothing _            = noTeamNameResponse
+deleteTeamDetailH (Just teamName) name = do
+    let method = "DELETE"
+        endpoint = AdminTeamDetail
+    conn <- asks _getRedisConn
+    result <- liftIO $ deleteTeam conn name
+    scorecard <- liftIO $ DB.upsertScoreCard conn teamName endpoint method
+    return $ Object $ HM.fromList [
+        ("status", String "success")
+        , ("currentScore", toJSON $ scorecard ^. totalScore)
+        , ("teamName", String teamName)
+        , ("data", toJSON result)
+        ]
 
 -- helpers, not handlers
 noTeamNameResponse :: HttpHuntApp Value

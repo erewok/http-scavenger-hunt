@@ -100,6 +100,17 @@ instance ToMarkup ArticleComment where
             H.p . toMarkup $ _comment comment
             H.p . toMarkup $ _commentAuthor comment
 
+data Team = Team {
+    name            :: Text
+    , avatar        :: Maybe Text
+    , members       :: [Text]
+    , catchphrase   :: Maybe Text
+    , combinedScore :: Maybe Integer
+} deriving (Eq, Show, Generic)
+
+instance FromJSON Team
+instance ToJSON Team
+
 -- | Keeping track of stuff
 newScorecard :: Text -> ScoreCard
 newScorecard teamName = ScoreCard {
@@ -130,6 +141,9 @@ data Endpoint =
     | AdminArticleList
     | AdminArticleDetail
     | AdminArticleComments
+    -- team endpoints
+    | AdminTeamList
+    | AdminTeamDetail
     -- public endpoints
     | PublicEndpoints
     | PublicArticleList
@@ -153,6 +167,8 @@ parseEndpoint = \case
     "AdminArticleList" -> AdminArticleList
     "AdminArticleDetail" -> AdminArticleDetail
     "AdminArticleComments" -> AdminArticleComments
+    "AdminTeamList" -> AdminTeamList
+    "AdminTeamDetail" -> AdminTeamDetail
     "PublicEndpoints" -> PublicEndpoints
     "PublicArticleList" -> PublicArticleList
     "PublicArticleDetail" -> PublicArticleDetail

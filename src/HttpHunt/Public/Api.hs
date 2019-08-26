@@ -25,9 +25,10 @@ type PublicHuntApi =
     -- list all articles
     :<|> "public" :> "articles" :> Header "TeamName" Text
         :> Get '[JSON] [Article]
-    -- list all articles
+    -- describe article JSON shape
     :<|> "public" :> "articles" :> "describe" :> Header "TeamName" Text
         :> Get '[JSON] Value
+    -- describe article comment JSON shape
     :<|> "public" :> "articles" :> "comments" :> "describe" :> Header "TeamName" Text
         :> Get '[JSON] Value
     -- get a particular article
