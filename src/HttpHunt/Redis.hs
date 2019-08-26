@@ -115,8 +115,8 @@ putTeam conn name team = do
     oldVersion <- getKey conn key :: (MonadIO m, MonadThrow m) => m (Maybe Team)
     -- we're simplifying here: turn them into HashMaps (via JSON) and then merge them together
     let oldTeamHM = toJSON oldVersion ^? _Object
-        newTeameHM = toJSON team ^? _Object
-        mergedTeam = HML.union <$> oldTeamHM <*> newTeameHM
+        newTeamHM = toJSON team ^? _Object
+        mergedTeam = HML.union <$> newTeamHM <*> oldTeamHM
     -- now that we have a merged HashMap, we need to make it into an Article
         parsedMergedTeam = fromJSON . Object <$> mergedTeam :: Maybe (Result Team)
     case parsedMergedTeam of
@@ -132,7 +132,7 @@ patchTeam conn name hm = do
             oldVersion <- getKey conn key :: (MonadIO m, MonadThrow m) => m (Maybe Team)
             -- we're simplifying here: turn them into HashMaps (via JSON) and then merge them together
             let oldTeamHM = toJSON oldVersion ^? _Object
-                mergedTeam = HML.union <$> oldTeamHM <*> pure newTeam
+                mergedTeam = HML.union <$> pure newTeam <*> oldTeamHM
             -- now that we have a merged HashMap, we need to make it into an Article
                 parsedMergedTeam = fromJSON . Object <$> mergedTeam :: Maybe (Result Team)
             case parsedMergedTeam of
