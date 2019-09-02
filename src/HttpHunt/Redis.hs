@@ -17,7 +17,7 @@ import           Data.Time.Clock      (UTCTime, getCurrentTime)
 import qualified Data.UUID            as UUID
 import qualified Data.UUID.V4         as UUID4
 import qualified Database.Redis       as Redis
-import           RIO                  hiding ((^.))
+import           RIO                  hiding (over, (^.))
 import qualified RIO.HashMap          as HM
 
 import           HttpHunt.Config
@@ -78,13 +78,16 @@ deletePost conn puid = do
     return puid
 
 -- | Comment related Redis functions
+addComments :: ArticleComment -> [ArticleComment] -> [ArticleComment]
+addComments comment comments = nub $ (:) comment comments
+
 createPostComment :: (MonadIO m, MonadThrow m) => Redis.Connection -> ArticleComment -> m Article
 createPostComment conn comment = do
     let puid = comment ^. articleId
     article <- getPost conn puid
     -- nub is O(n^2), among other things...
     -- did we mention that this is all just a demonstration
-    let article' = article {_comments = nub $ (:) comment (article ^. comments)}
+    let article' = over comments (addComments comment) article
     updateWholePost conn puid article'
     return article'
 
