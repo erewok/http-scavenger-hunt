@@ -49,4 +49,4 @@ RUN adduser --disabled-password --gecos "" scavenger \
 USER scavenger
 EXPOSE 8000
 
-CMD ["/opt/http-scavenger-hunt/bin//http-scavenger-hunt"]
+ENTRYPOINT ["/opt/http-scavenger-hunt/bin/http-scavenger-hunt"]
