@@ -40,7 +40,7 @@ homePageJSON = pure $
         ("logo", String (T.pack _LOGO)),
         ("tips", Array $ V.fromList [
             String "If you identify yourself, you will get points for each new endpoint and method you try",
-            String "For some endpoints you should provide an auth header",
+            String "For some endpoints you should provide an auth header (try `teamName`...)",
             String "Admin endpoints can be discovered at /admin/endpoints",
             String "Public endpoints can be discovered at /public/endpoints",
             String "You may also find some poorly documented (or undcoumented!) endpoints as well!"
