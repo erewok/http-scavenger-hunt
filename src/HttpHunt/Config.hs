@@ -49,7 +49,7 @@ data ApiConfig = ApiConfig {
 } deriving (Eq, Show, Generic)
 
 instance DefConfig ApiConfig where
-    defConfig = ApiConfig Local "v1" 3000 "localhost" "6379" "3" Nothing
+    defConfig = ApiConfig Local "v1" 8000 "localhost" "6379" "3" Nothing
 
 -- All fields will be converted to uppercase
 instance FromEnv ApiConfig
